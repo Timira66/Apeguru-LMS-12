@@ -1,0 +1,9 @@
+{
+  "name": "Ape Guru Smart LMS",
+  "description": "A premium, next-generation Learning Management System with iOS Glassmorphism aesthetic, AI-powered analytics, and real-time collaboration.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
