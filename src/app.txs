@@ -1,0 +1,133 @@
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { User } from './types';
+import { Login } from './pages/Login';
+import { SignUp } from './pages/SignUp';
+import { Layout } from './components/Layout';
+import { Dashboard } from './pages/Dashboard';
+import { Courses } from './pages/Courses';
+import { StudentManagement } from './pages/StudentManagement';
+import { Tests } from './pages/Tests';
+import { AttendanceAdmin } from './pages/AttendanceAdmin';
+import { Progress } from './pages/Progress';
+import { Preschool } from './pages/Preschool';
+import { ContentManagement } from './pages/ContentManagement';
+import { AboutUs } from './pages/AboutUs';
+import { HowTo } from './pages/HowTo';
+import { Profile } from './pages/Profile';
+import { AttendancePage } from './pages/Attendance';
+import { Meetings } from './pages/Meetings';
+
+import { supabase } from './supabaseClient';
+
+// Context
+export const AuthContext = createContext<{
+  user: User | null;
+  login: (user: User) => void;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
+}>({
+  user: null,
+  login: () => {},
+  logout: () => {},
+  refreshUser: async () => {},
+});
+
+// Main App Component
+export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Initial session check
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        handleUserSession(session.user);
+      }
+      setIsLoading(false);
+    };
+
+    initAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        handleUserSession(session.user);
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleUserSession = (supabaseUser: any) => {
+    const isAdmin = supabaseUser.email === 'shenaltimira6@gamail.com';
+    const appUser: User = {
+      id: supabaseUser.id,
+      username: supabaseUser.email?.split('@')[0] || 'User',
+      role: isAdmin ? 'admin' : 'student',
+      status: 'active',
+      grade: 'Grade 10',
+      subjects: [],
+    };
+    setUser(appUser);
+  };
+
+  const login = (userData: User) => {
+    setUser(userData);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  };
+
+  const refreshUser = async () => {
+    if (!user) return;
+    const res = await fetch(`/api/users/${user.id}`);
+    if (res.ok) {
+      const updated = await res.json();
+      login(updated);
+    }
+  };
+
+  if (isLoading) return null;
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout, refreshUser }}>
+      <Router>
+        <Routes>
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
+          <Route path="/signup" element={!user ? <SignUp /> : <Navigate to="/" />} />
+          <Route path="/*" element={
+            user ? (
+              <Layout>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/courses" element={<Courses />} />
+                  <Route path="/meetings" element={<Meetings />} />
+                  <Route path="/tests" element={<Tests />} />
+                  <Route path="/attendance" element={<AttendancePage />} />
+                  <Route path="/progress" element={<Progress />} />
+                  <Route path="/preschool" element={<Preschool />} />
+                  <Route path="/about" element={<AboutUs />} />
+                  <Route path="/how-to" element={<HowTo />} />
+                  <Route path="/profile" element={<Profile />} />
+                  {user.role === 'admin' && (
+                    <>
+                      <Route path="/students" element={<StudentManagement />} />
+                      <Route path="/content-admin" element={<ContentManagement />} />
+                      <Route path="/attendance-admin" element={<AttendanceAdmin />} />
+                    </>
+                  )}
+                </Routes>
+              </Layout>
+            ) : <Navigate to="/login" />
+          } />
+        </Routes>
+      </Router>
+    </AuthContext.Provider>
+  );
+}
